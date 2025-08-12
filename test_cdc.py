@@ -1,38 +1,44 @@
 #!/usr/bin/env python3
-# test_cdc.py (Revised for External Trino HTTP API)
+# test_cdc.py (Revised for SQL Server via pyodbc)
 # Flow:
-#   1) Insert test rows into Postgres
-# Requires: pip install requests
+#   1) Insert test rows into SQL Server
+# Requires: pip install requests pyodbc
 
-import subprocess
+import pyodbc
 import sys
 import json
 import random
 import os
 
-PG_SVC = os.getenv("PG_SVC", "kafka-postgres")
 PROD_TRINO_HOST = os.getenv("PROD_TRINO_HOST", "10.17.26.218")
 PROD_TRINO_PORT = os.getenv("PROD_TRINO_PORT", "8080")
 PROD_TRINO_CATALOG = os.getenv("PROD_TRINO_CATALOG", "iceberg")
 PROD_TRINO_SCHEMA = os.getenv("PROD_TRINO_SCHEMA", "cdc")
 
+SQLSERVER_HOST = os.getenv("SQLSERVER_HOST", "kafka-sqlserver")
+SQLSERVER_PORT = os.getenv("SQLSERVER_PORT", "1433")
+SQLSERVER_USER = os.getenv("SQLSERVER_USER", "sa")
+SQLSERVER_PASSWORD = os.getenv("SQLSERVER_PASSWORD", "YourStrongPassword123!")
+SQLSERVER_DB = os.getenv("SQLSERVER_DB", "postgres")
+
 TRINO_URL = f"http://{PROD_TRINO_HOST}:{PROD_TRINO_PORT}"
 
-def run(command, check=True, capture=True):
-    try:
-        ret = subprocess.run(command, shell=True, check=check, capture_output=capture, text=True)
-        return (ret.stdout + ret.stderr).strip()
-    except subprocess.CalledProcessError as e:
-        out = (e.stdout or "") + (e.stderr or "")
-        if capture:
-            print(out, file=sys.stderr)
-        if check:
-            raise
-        return out.strip()
+def get_conn():
+    conn_str = (
+        "DRIVER={ODBC Driver 17 for SQL Server};"
+        f"SERVER={SQLSERVER_HOST},{SQLSERVER_PORT};"
+        f"DATABASE={SQLSERVER_DB};"
+        f"UID={SQLSERVER_USER};"
+        f"PWD={SQLSERVER_PASSWORD}"
+    )
+    return pyodbc.connect(conn_str)
 
-def query_pg(sql):
-    cmd = f'docker compose exec -T {PG_SVC} psql -U postgres -d postgres -c "{sql}"'
-    return run(cmd)
+def query_sqlserver(sql):
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(sql)
+        rows = cur.fetchall()
+        return "\n".join(str(row) for row in rows)
 
 def insert_test_rows():
     random_email = f"test_{random.randint(100000, 999999)}@example.com"
@@ -41,28 +47,30 @@ def insert_test_rows():
     INSERT INTO commerce.account (email) VALUES ('{random_email}');
     INSERT INTO commerce.product (product_name) VALUES ('{random_product}');
     """
-    print("Inserting test data into PostgreSQL...")
-    cmd = f"echo \"{insert_sql}\" | docker compose exec -T {PG_SVC} psql -U postgres -d postgres"
-    run(cmd)
+    print("Inserting test data into SQL Server...")
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(insert_sql)
+        conn.commit()
     return random_email, random_product
 
 def main():
-    print("Querying Postgres (before insert)...")
+    print("Querying SQL Server (before insert)...")
     try:
-        print(query_pg("SELECT * FROM commerce.account ORDER BY user_id;"))
-        print(query_pg("SELECT * FROM commerce.product ORDER BY product_id;"))
+        print(query_sqlserver("SELECT * FROM commerce.account ORDER BY user_id;"))
+        print(query_sqlserver("SELECT * FROM commerce.product ORDER BY product_id;"))
     except Exception as e:
-        print(f"(warn) Failed to query Postgres baseline: {e}")
+        print(f"(warn) Failed to query SQL Server baseline: {e}")
 
     email, product = insert_test_rows()
     print("Inserted:", email, product)
 
-    print("Querying Postgres (after insert)...")
+    print("Querying SQL Server (after insert)...")
     try:
-        print(query_pg("SELECT * FROM commerce.account ORDER BY user_id;"))
-        print(query_pg("SELECT * FROM commerce.product ORDER BY product_id;"))
+        print(query_sqlserver("SELECT * FROM commerce.account ORDER BY user_id;"))
+        print(query_sqlserver("SELECT * FROM commerce.product ORDER BY product_id;"))
     except Exception as e:
-        print(f"(warn) Failed to query Postgres after insert: {e}")
+        print(f"(warn) Failed to query SQL Server after insert: {e}")
 
 if __name__ == "__main__":
     main()

@@ -17,7 +17,7 @@ HIVE_MS_VERSION="${HIVE_MS_VERSION:-3.1.3}"
 # ---- Paths ----
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGINS_DIR="${ROOT_DIR}/kafka/plugins"
-DBZ_PLUGIN_DIR="${PLUGINS_DIR}/debezium-connector-postgres"
+DBZ_PLUGIN_DIR="${PLUGINS_DIR}/debezium-connector-sqlserver"
 IC_PLUGIN_DIR="${PLUGINS_DIR}/iceberg-kafka-connect"
 
 STAGE_ROOT="${ROOT_DIR}/target/dependencies"
@@ -44,12 +44,12 @@ log "Java & Maven versions"
 (java -version || true) 2>&1
 (mvn -version || true) 2>&1
 
-# ---- A) Debezium Postgres plugin ZIP ----
-log "A1) Debezium Postgres connector -> ${STAGE_DBZ}"
+# ---- A) Debezium SQL Server plugin ZIP ----
+log "A1) Debezium SQL Server connector -> ${STAGE_DBZ}"
 "${MVN[@]}" "${MDEP}:copy" \
-  -Dartifact="io.debezium:debezium-connector-postgres:${DEBEZIUM_VERSION}:zip:plugin" \
+  -Dartifact="io.debezium:debezium-connector-sqlserver:${DEBEZIUM_VERSION}:zip:plugin" \
   -DoutputDirectory="${STAGE_DBZ}"
-DBZ_ZIP="$(ls -1 "${STAGE_DBZ}"/debezium-connector-postgres-*plugin.zip | head -n1 || true)"
+DBZ_ZIP="$(ls -1 "${STAGE_DBZ}"/debezium-connector-sqlserver-*plugin.zip | head -n1 || true)"
 [[ -n "${DBZ_ZIP}" ]] || die "Debezium plugin ZIP not found in ${STAGE_DBZ}"
 
 log "A2) Extract Debezium plugin"

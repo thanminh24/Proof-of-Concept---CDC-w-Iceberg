@@ -21,7 +21,7 @@ services:
       - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
       - KAFKA_LOG_DIRS=/tmp/kraft-combined-logs
       - AWS_REGION=us-east-1
-      - AWS_DEFAULT_REGION=us-east-1 
+      - AWS_DEFAULT_REGION=us-east-1
     user: root
     volumes:
       - "$PWD/kafka/config:/opt/kafka/config-cdc"
@@ -33,19 +33,20 @@ services:
     deploy:
       replicas: 1
 
-  kafka-postgres:
-    hostname: kafka-postgres
-    container_name: kafka-postgres
-    image: 'postgres:16.2'
+  kafka-sqlserver:
+    hostname: kafka-sqlserver
+    container_name: kafka-sqlserver
+    image: 'mcr.microsoft.com/mssql/server:2022-latest'
     ports:
-      - '5433:5432'
+      - '1433:1433'
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrongPassword123!
+      - MSSQL_PID=Developer
+      - MSSQL_AGENT_ENABLED=True
+    command: ["/bin/bash", "-c", "/opt/mssql/bin/sqlservr & until /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P $$SA_PASSWORD -Q 'SELECT 1' &> /dev/null; do sleep 1; done; /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P $$SA_PASSWORD -i /init.sql"]
     volumes:
-      - "$PWD/postgres/postgresql.conf:/etc/postgresql/postgresql.conf"
-      - "$PWD/postgres/scripts/seed:/docker-entrypoint-initdb.d"
+      - "$PWD/sqlserver/init.sql:/init.sql"
     env_file:
       - .env
     deploy:

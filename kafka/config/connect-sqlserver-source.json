@@ -1,0 +1,17 @@
+{
+    "name": "dbz-sqlserver-source",
+    "config": {
+      "connector.class": "io.debezium.connector.sqlserver.SqlServerConnector",
+      "database.hostname": "${SQLSERVER_HOST}",
+      "database.port": "1433",
+      "database.user": "${SQLSERVER_USER}",
+      "database.password": "${SQLSERVER_PASSWORD}",
+      "database.names": "${SQLSERVER_DB}",
+      "topic.prefix": "cdc",
+      "schema.include.list": "commerce",
+      "table.include.list": "commerce.account,commerce.product",
+      "heartbeat.interval.ms": "1000",
+      "snapshot.mode": "initial",
+      "database.encrypt": "false"
+    }
+  }

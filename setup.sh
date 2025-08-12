@@ -28,7 +28,7 @@ log "E1) Starting Connect (standalone) with your configs"
 docker compose exec -d "${SVC_KAFKA}" \
   /opt/kafka/bin/connect-standalone.sh \
   /opt/kafka/config-cdc/connect-standalone.properties \
-  /opt/kafka/config-cdc/connect-postgres-source.json \
+  /opt/kafka/config-cdc/connect-sqlserver-source.json \
   /opt/kafka/config-cdc/connect-iceberg-sink.json
 
 echo
@@ -36,5 +36,5 @@ echo "Tail logs:"
 echo "  docker compose logs -f ${SVC_KAFKA} | sed -n '1,200p'"
 echo
 echo "Check status:"
-echo "  curl -s http://localhost:8083/connectors/dbz-pg-source/status | jq"
+echo "  curl -s http://localhost:8083/connectors/dbz-sqlserver-source/status | jq"
 echo "  curl -s http://localhost:8083/connectors/iceberg-sink/status | jq"

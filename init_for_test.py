@@ -1,6 +1,6 @@
 # init_for_test.py (Revised for SQL Server)
 # Creates SQL Server tables, inserts initial data, and optionally creates Iceberg tables in lakehouse via Trino HTTP API if not existing.
-# Assumptions: SQL Server service accessible via env vars, PROD_TRINO_* from .env
+# Assumptions: SQL Server service accessible via environment variables; PROD_TRINO_* values override defaults when set
 #   CREATE_ICEBERG_TABLES=1 to enable Iceberg creation (default 0)
 # Requires: pip install requests pyodbc
 

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # init_for_test.py (Revised for SQL Server)
 # Creates SQL Server tables, inserts initial data, and optionally creates Iceberg tables in lakehouse via Trino HTTP API if not existing.
 # Assumptions: SQL Server service accessible via env vars, PROD_TRINO_* from .env
@@ -11,10 +10,11 @@ import os
 import requests
 
 SQLSERVER_HOST = os.getenv("SQLSERVER_HOST", "kafka-sqlserver")
+SQLSERVER_IP = " 192.168.0.107"  # Override with provided IP
 SQLSERVER_PORT = os.getenv("SQLSERVER_PORT", "1433")
 SQLSERVER_USER = os.getenv("SQLSERVER_USER", "sa")
 SQLSERVER_PASSWORD = os.getenv("SQLSERVER_PASSWORD", "YourStrongPassword123!")
-SQLSERVER_DB = os.getenv("SQLSERVER_DB", "postgres")
+SQLSERVER_DB = os.getenv("SQLSERVER_DB", "commerce")
 
 PROD_TRINO_HOST = os.getenv("PROD_TRINO_HOST", "10.17.26.218")
 PROD_TRINO_PORT = os.getenv("PROD_TRINO_PORT", "8080")
@@ -25,11 +25,12 @@ CREATE_ICEBERG_TABLES = int(os.getenv("CREATE_ICEBERG_TABLES", "0"))
 
 def get_conn():
     conn_str = (
-        "DRIVER={ODBC Driver 17 for SQL Server};"
+        "DRIVER={ODBC Driver 18 for SQL Server};"
         f"SERVER={SQLSERVER_HOST},{SQLSERVER_PORT};"
         f"DATABASE={SQLSERVER_DB};"
         f"UID={SQLSERVER_USER};"
-        f"PWD={SQLSERVER_PASSWORD}"
+        f"PWD={SQLSERVER_PASSWORD};"
+        "TrustServerCertificate=Yes"
     )
     return pyodbc.connect(conn_str)
 
@@ -107,4 +108,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

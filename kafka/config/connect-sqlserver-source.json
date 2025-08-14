@@ -1,17 +1,21 @@
 {
-    "name": "dbz-sqlserver-source",
-    "config": {
-      "connector.class": "io.debezium.connector.sqlserver.SqlServerConnector",
-      "database.hostname": "${SQLSERVER_HOST}",
-      "database.port": "1433",
-      "database.user": "${SQLSERVER_USER}",
-      "database.password": "${SQLSERVER_PASSWORD}",
-      "database.names": "${SQLSERVER_DB}",
-      "topic.prefix": "cdc",
-      "schema.include.list": "commerce",
-      "table.include.list": "commerce.account,commerce.product",
-      "heartbeat.interval.ms": "1000",
-      "snapshot.mode": "initial",
-      "database.encrypt": "false"
-    }
+  "name": "dbz-sqlserver-source",
+  "config": {
+    "connector.class": "io.debezium.connector.sqlserver.SqlServerConnector",
+    "database.hostname": "kafka-sqlserver",
+    "database.port": "1433",
+    "database.user": "sa",
+    "database.password": "YourStrongPassword123!",
+    "database.names": "commerce",
+    "topic.prefix": "cdc",
+    "schema.include.list": "commerce",
+    "table.include.list": "commerce.account,commerce.product",
+    "heartbeat.interval.ms": "1000",
+    "snapshot.mode": "initial",
+    "database.encrypt": "false",
+    "schema.history.internal.kafka.topic": "schemahistory.commerce",
+    "schema.history.internal.kafka.bootstrap.servers": "kafka-standalone:9092",
+    "snapshot.locking.max.wait.ms": "30000",
+    "errors.tolerance": "none"
   }
+}

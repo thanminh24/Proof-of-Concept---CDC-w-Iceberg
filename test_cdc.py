@@ -1,68 +1,95 @@
-#!/usr/bin/env python3
-# test_cdc.py (Revised for External Trino HTTP API)
+# test_cdc.py (Revised for SQL Server via pyodbc)
 # Flow:
-#   1) Insert test rows into Postgres
-# Requires: pip install requests
+#   1) Query SQL Server tables
+#   2) Insert test rows into SQL Server
+#   3) Re-query to verify inserts
+# Requires: pip install pyodbc
 
-import subprocess
-import sys
-import json
-import random
+import pyodbc
 import os
+import random
+import time
+from typing import Tuple
 
-PG_SVC = os.getenv("PG_SVC", "kafka-postgres")
-PROD_TRINO_HOST = os.getenv("PROD_TRINO_HOST", "10.17.26.218")
-PROD_TRINO_PORT = os.getenv("PROD_TRINO_PORT", "8080")
-PROD_TRINO_CATALOG = os.getenv("PROD_TRINO_CATALOG", "iceberg")
-PROD_TRINO_SCHEMA = os.getenv("PROD_TRINO_SCHEMA", "cdc")
+# Configuration from environment variables
+SQLSERVER_HOST = os.getenv("SQLSERVER_HOST", "localhost")
+SQLSERVER_PORT = os.getenv("SQLSERVER_PORT", "1433")
+SQLSERVER_USER = os.getenv("SQLSERVER_USER", "sa")
+SQLSERVER_PASSWORD = os.getenv("SQLSERVER_PASSWORD", "YourStrongPassword123!")
+SQLSERVER_DB = os.getenv("SQLSERVER_DB", "commerce")
 
-TRINO_URL = f"http://{PROD_TRINO_HOST}:{PROD_TRINO_PORT}"
+def get_conn(max_retries: int = 10, retry_delay: int = 5) -> pyodbc.Connection:
+    """Establish a connection to SQL Server with retries."""
+    conn_str = (
+        "DRIVER={ODBC Driver 18 for SQL Server};"
+        f"SERVER={SQLSERVER_HOST},{SQLSERVER_PORT};"
+        f"DATABASE={SQLSERVER_DB};"
+        f"UID={SQLSERVER_USER};"
+        f"PWD={SQLSERVER_PASSWORD};"
+        "TrustServerCertificate=Yes"
+    )
+    for attempt in range(max_retries):
+        try:
+            print(f"Attempting to connect to SQL Server at {SQLSERVER_HOST}:{SQLSERVER_PORT}...")
+            conn = pyodbc.connect(conn_str)
+            print(f"Connected to SQL Server at {SQLSERVER_HOST}")
+            return conn
+        except pyodbc.Error as e:
+            print(f"Connection attempt {attempt + 1}/{max_retries} failed: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+            else:
+                raise Exception(f"Failed to connect to SQL Server after {max_retries} attempts: {e}")
 
-def run(command, check=True, capture=True):
+def query_sqlserver(sql: str) -> str:
+    """Execute a SQL query and return results as a string."""
     try:
-        ret = subprocess.run(command, shell=True, check=check, capture_output=capture, text=True)
-        return (ret.stdout + ret.stderr).strip()
-    except subprocess.CalledProcessError as e:
-        out = (e.stdout or "") + (e.stderr or "")
-        if capture:
-            print(out, file=sys.stderr)
-        if check:
-            raise
-        return out.strip()
+        with get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute(sql)
+            rows = cur.fetchall()
+            return "\n".join(str(row) for row in rows)
+    except pyodbc.Error as e:
+        return f"Query failed: {e}"
 
-def query_pg(sql):
-    cmd = f'docker compose exec -T {PG_SVC} psql -U postgres -d postgres -c "{sql}"'
-    return run(cmd)
-
-def insert_test_rows():
+def insert_test_rows() -> Tuple[str, str]:
+    """Insert random test data into account and product tables."""
     random_email = f"test_{random.randint(100000, 999999)}@example.com"
-    random_product = f"Item_{random.choice(['A','B','C'])}{random.randint(100000, 999999)}"
-    insert_sql = f"""
-    INSERT INTO commerce.account (email) VALUES ('{random_email}');
-    INSERT INTO commerce.product (product_name) VALUES ('{random_product}');
+    random_product = f"Item_{random.choice(['A', 'B', 'C'])}{random.randint(100000, 999999)}"
+    insert_sql = """
+    INSERT INTO commerce.account (email) VALUES (?);
+    INSERT INTO commerce.product (product_name) VALUES (?);
     """
-    print("Inserting test data into PostgreSQL...")
-    cmd = f"echo \"{insert_sql}\" | docker compose exec -T {PG_SVC} psql -U postgres -d postgres"
-    run(cmd)
-    return random_email, random_product
+    print("Inserting test data into SQL Server...")
+    try:
+        with get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute(insert_sql, (random_email, random_product))
+            conn.commit()
+        print(f"Inserted: {random_email}, {random_product}")
+        return random_email, random_product
+    except pyodbc.Error as e:
+        print(f"Insert failed: {e}")
+        return "", ""
 
 def main():
-    print("Querying Postgres (before insert)...")
-    try:
-        print(query_pg("SELECT * FROM commerce.account ORDER BY user_id;"))
-        print(query_pg("SELECT * FROM commerce.product ORDER BY product_id;"))
-    except Exception as e:
-        print(f"(warn) Failed to query Postgres baseline: {e}")
+    """Main function to query, insert, and re-query SQL Server tables."""
+    # Query before insert
+    print("Querying SQL Server (before insert)...")
+    print("Accounts:")
+    print(query_sqlserver("SELECT * FROM commerce.account ORDER BY user_id;"))
+    print("Products:")
+    print(query_sqlserver("SELECT * FROM commerce.product ORDER BY product_id;"))
 
+    # Insert test data
     email, product = insert_test_rows()
-    print("Inserted:", email, product)
 
-    print("Querying Postgres (after insert)...")
-    try:
-        print(query_pg("SELECT * FROM commerce.account ORDER BY user_id;"))
-        print(query_pg("SELECT * FROM commerce.product ORDER BY product_id;"))
-    except Exception as e:
-        print(f"(warn) Failed to query Postgres after insert: {e}")
+    # Query after insert
+    print("\nQuerying SQL Server (after insert)...")
+    print("Accounts:")
+    print(query_sqlserver("SELECT * FROM commerce.account ORDER BY user_id;"))
+    print("Products:")
+    print(query_sqlserver("SELECT * FROM commerce.product ORDER BY product_id;"))
 
 if __name__ == "__main__":
     main()
